@@ -1,33 +1,51 @@
 from flask import Flask, request, send_file
 from TTS.api import TTS
 from io import BytesIO
+import soundfile as sf
 
 app = Flask(__name__)
 
-# TTS model setup
-tts_model = TTS(model_name="tts_models/en/vctk/vits")
+# Initialize TTS model (CPU mode for Render)
+tts_model = TTS(
+    model_name="tts_models/en/vctk/vits",
+    progress_bar=False,
+    gpu=False
+)
+
 DEFAULT_SPEAKER = "p267"
 
 @app.route("/tts", methods=["POST"])
 def tts():
     data = request.get_json()
-    text = data.get("text", "")
 
-    if not text:
+    if not data or "text" not in data:
         return {"error": "No text provided"}, 400
 
-    # Generate TTS into memory
-    audio_bytes = BytesIO()
-    tts_model.tts_to_file(text=text, file_path=audio_bytes, speaker=DEFAULT_SPEAKER)
-    audio_bytes.seek(0)
+    text = data["text"]
 
-    # Return as binary for n8n
-    return send_file(
-        audio_bytes,
-        mimetype="audio/mpeg",
-        as_attachment=True,
-        download_name="voice.mp3"
-    )
+    try:
+        # Generate audio waveform (numpy array)
+        audio = tts_model.tts(
+            text=text,
+            speaker=DEFAULT_SPEAKER
+        )
+
+        # Save to memory buffer
+        audio_bytes = BytesIO()
+        sf.write(audio_bytes, audio, samplerate=22050, format="WAV")
+        audio_bytes.seek(0)
+
+        # Return audio file
+        return send_file(
+            audio_bytes,
+            mimetype="audio/wav",
+            as_attachment=True,
+            download_name="voice.wav"
+        )
+
+    except Exception as e:
+        return {"error": str(e)}, 500
+
 
 if __name__ == "__main__":
     import os
