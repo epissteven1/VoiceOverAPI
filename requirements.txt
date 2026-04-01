@@ -1,4 +1,6 @@
-Flask==2.3.2
-TTS==0.13.0
+Flask>=2.3.2,<3.0
+TTS>=0.13.0
 numpy
 torch
+gunicor
+
